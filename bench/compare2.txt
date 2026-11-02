@@ -1,0 +1,92 @@
+
+100000 keys, 100-byte values, fsync on every commit, cache 64 MiB (baseDB, Pebble), 2s per timed run, median of 3 run(s)
+
+bulk-seq: insert all keys in increasing order, 1,000 keys per transaction
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1      309,127      3.2µs          -          -     23.3 MiB
+  bbolt              1      376,187      2.7µs          -          -     32.0 MiB
+  bbolt-batch        1      392,385      2.5µs          -          -     32.0 MiB
+  pebble             1      841,344      1.2µs          -          -     10.7 MiB
+
+bulk-rand: insert all keys in random order, 1,000 keys per transaction
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1       45,409     22.0µs          -          -     17.6 MiB
+  bbolt              1       40,277     24.8µs          -          -     32.0 MiB
+  bbolt-batch        1       40,547     24.7µs          -          -     32.0 MiB
+  pebble             1      845,824      1.2µs          -          -     10.3 MiB
+
+read: 100% random point reads (YCSB C)
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1      881,106      1.1µs         ≈0         ≈0            -
+  bbolt              1      784,840      1.3µs         ≈0         ≈0            -
+  bbolt-batch        1      785,894      1.3µs         ≈0         ≈0            -
+  pebble             1      522,214      1.9µs         ≈0         ≈0            -
+
+read-mostly: 95% reads, 5% updates (YCSB B)
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1       22,441     44.6µs         ≈0     1.05ms            -
+  bbolt              1       10,562     94.7µs         ≈0     2.09ms            -
+  bbolt-batch        1        1,458    685.9µs         ≈0    13.33ms            -
+  pebble             1       22,626     44.2µs         ≈0     1.04ms            -
+
+mixed: 50% reads, 50% updates (YCSB A)
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1        2,238    446.9µs         ≈0     1.26ms            -
+  bbolt              1        1,050    952.7µs     1.00ms     2.67ms            -
+  bbolt-batch        1          150     6.65ms    11.58ms    14.11ms            -
+  pebble             1        2,253    443.9µs         ≈0     1.42ms            -
+
+update: 100% random updates, one key per transaction
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1        1,160    861.8µs     1.00ms     1.53ms            -
+  bbolt              1          529     1.89ms     2.00ms     2.74ms            -
+  bbolt-batch        1           78    12.88ms    12.89ms    14.43ms            -
+  pebble             1        1,130    884.9µs    999.9µs     1.75ms            -
+
+scan: short range scans from a random key (YCSB E, reads only)
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1      246,048      4.1µs         ≈0         ≈0            -
+  bbolt              1      722,501      1.4µs         ≈0         ≈0            -
+  bbolt-batch        1      723,952      1.4µs         ≈0         ≈0            -
+  pebble             1      352,884      2.8µs         ≈0         ≈0            -
+
+writers: N concurrent writers, one new key per transaction
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1        1,154    866.8µs     1.00ms     1.58ms            -
+  basedb             8        3,479     2.30ms     2.00ms     7.62ms            -
+  basedb            64       34,899     1.83ms     1.62ms     3.02ms            -
+  bbolt              1          538     1.86ms     1.98ms     2.77ms            -
+  bbolt              8          544    14.71ms    14.58ms    16.57ms            -
+  bbolt             64          552   115.86ms   115.97ms   119.36ms            -
+  bbolt-batch        1           78    12.83ms    12.80ms    14.26ms            -
+  bbolt-batch        8          618    12.94ms    12.95ms    14.57ms            -
+  bbolt-batch       64        4,694    13.63ms    13.64ms    14.98ms            -
+  pebble             1        1,137    879.4µs     1.00ms     1.61ms            -
+  pebble             8        4,561     1.75ms     1.62ms     2.64ms            -
+  pebble            64       36,274     1.76ms     1.62ms     2.69ms            -
+
+space: loaded
+  store             on disk
+  basedb           17.6 MiB
+  bbolt            32.0 MiB
+  bbolt-batch      32.0 MiB
+  pebble           10.3 MiB
+
+space: half deleted
+  store             on disk
+  basedb           17.6 MiB
+  bbolt            32.0 MiB
+  bbolt-batch      32.0 MiB
+  pebble            0.9 MiB
+
+space: refilled
+  store             on disk
+  basedb           20.5 MiB
+  bbolt            32.0 MiB
+  bbolt-batch      32.0 MiB
+  pebble            5.6 MiB
+
+avg is exact (time / operations). p50 and p99 come from per-operation timings; ≈0 means below this
+machine's clock resolution (on Windows a few µs or more), so read those from avg instead.
+
+wrote compare.csv

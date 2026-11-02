@@ -1,0 +1,48 @@
+A/B test of the checkpoint storm fix (docs/ARCHITECTURE.md §9.6)
+
+old = maybeCheckpoint before the fix (every commit past CheckpointBytes runs Checkpoint)
+new = one automatic checkpoint at a time, size re-checked under the exclusive lock
+Both binaries built from the same tree, run alternately in one session.
+
+Embedded: bench/compare -dbs basedb -workloads update,writers -writers 1,8,32,64 -runs 2
+  columns: store, threads, ops/s, avg, p50, p99, on disk
+  first row = update workload (1 thread), then writers 1, 8, 32, 64
+TCP:      cmd/basedb-bench -clients 16,32,64 -group-commit on
+  columns: group commit, clients, ops, ops/s, p50, p99, fsyncs, writes/fsync
+
+=== round 1: old
+  basedb             1        1,118    882.3µs     1.00ms     1.59ms            -
+  basedb             1        1,155    864.8µs     1.00ms     1.56ms            -
+  basedb             8        3,240     2.40ms     2.01ms     8.31ms            -
+  basedb            32       12,436     2.28ms     1.64ms    18.55ms            -
+  basedb            64       14,609     4.37ms     1.66ms    20.95ms            -
+on                 16      13213         6602       2ms    7.98ms     2168          6.1
+on                 32      24152        12069    1.71ms      19ms     1681         14.4
+on                 64      25849        12917       2ms      23ms      897         28.8
+=== round 1: new
+  basedb             1        1,127    885.4µs     1.00ms     1.57ms            -
+  basedb             1        1,159    855.2µs     1.00ms     1.56ms            -
+  basedb             8        3,463     2.19ms     1.99ms     6.34ms            -
+  basedb            32       12,947     1.84ms     1.63ms     3.06ms            -
+  basedb            64       31,503     1.86ms     1.63ms     3.03ms            -
+on                 16      15440         7715    1.74ms       9ms     2526          6.1
+on                 32      31190        15587    1.68ms    8.01ms     2279         13.7
+on                 64      64615        32276       2ms    3.61ms     2081         31.0
+=== round 2: old
+  basedb             1        1,109    888.5µs     1.00ms     1.63ms            -
+  basedb             1        1,106    855.1µs     1.00ms     1.55ms            -
+  basedb             8        3,443     2.28ms     2.00ms     7.63ms            -
+  basedb            32       12,152     2.60ms     1.68ms    19.02ms            -
+  basedb            64       14,790     3.51ms     1.65ms    22.38ms            -
+on                 16      12152         6072       2ms   11.58ms     2083          5.8
+on                 32      19683         8439       2ms   20.63ms     1473         13.4
+on                 64      24096        12040    2.99ms      32ms      880         27.4
+=== round 2: new   (the disk was slow in this round: 1 writer only 712/s)
+  basedb             1          973    939.4µs    999.8µs     2.01ms            -
+  basedb             1          712    940.8µs    999.7µs     2.88ms            -
+  basedb             8        3,111     2.44ms     2.00ms    10.52ms            -
+  basedb            32        5,714     2.29ms     2.00ms     7.51ms            -
+  basedb            64       18,367     2.57ms     2.00ms    12.00ms            -
+on                 16      14048         7015       2ms    6.26ms     2119          6.6
+on                 32      27151        13565       2ms       7ms     2007         13.5
+on                 64      53034        26491       2ms    5.01ms     1756         30.2

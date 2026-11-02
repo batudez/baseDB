@@ -1,0 +1,131 @@
+NOTE (added afterwards): this run is flawed, kept for the record. Every key had the same value,
+so the compressing stores shrank their files (RocksDB: 100,000 keys in 1.6 MiB), and "on disk"
+counted Pebble's recycled log files. Use compare4 instead (bench/compare/README.md).
+
+baseDB storage engine comparison, 2026-11-01 00:56
+machine: DESKTOP-0PAD1EB, windows/amd64, 8 CPUs, go1.23.0
+command: 
+stores:
+  basedb       this repository (working tree)
+  pebble       github.com/cockroachdb/pebble v1.1.2
+  sqlite       SQLite 3.53.4 (C API, MSYS2 package)
+  rocksdb      RocksDB 11.1.1 (C API, MSYS2 package)
+  redb         redb 4.4.0 (Rust, through a C ABI DLL)
+  wiredtiger   WiredTiger 11.3.1: (November 13, 2024) (C API, built from source with MinGW)
+
+100000 keys, 100-byte values, fsync on every commit, cache 64 MiB per store, 2s per timed run, median of 3 run(s)
+
+bulk-seq: insert all keys in increasing order, 1,000 keys per transaction
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1      264,526      3.8µs          -          -     23.3 MiB
+  pebble             1      934,836      1.1µs          -          -     10.7 MiB
+  sqlite             1      514,495      1.9µs          -          -     13.5 MiB
+  rocksdb            1      805,442      1.2µs          -          -      1.5 MiB
+  redb               1      541,571      1.8µs          -          -     16.1 MiB
+  wiredtiger         1      627,020      1.6µs          -          -     11.5 MiB
+
+bulk-rand: insert all keys in random order, 1,000 keys per transaction
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1       42,905     23.3µs          -          -     17.6 MiB
+  pebble             1      858,834      1.2µs          -          -     10.3 MiB
+  sqlite             1       38,846     25.7µs          -          -     13.4 MiB
+  rocksdb            1      535,232      1.9µs          -          -      1.6 MiB
+  redb               1       42,543     23.5µs          -          -     32.1 MiB
+  wiredtiger         1      100,138     10.0µs          -          -     13.0 MiB
+
+read: 100% random point reads (YCSB C)
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1      819,995      1.2µs         ≈0         ≈0            -
+  pebble             1      443,707      2.3µs         ≈0         ≈0            -
+  sqlite             1      301,873      3.3µs         ≈0         ≈0            -
+  rocksdb            1      504,245      2.0µs         ≈0         ≈0            -
+  redb               1      626,204      1.6µs         ≈0         ≈0            -
+  wiredtiger         1      882,898      1.1µs         ≈0         ≈0            -
+
+read-mostly: 95% reads, 5% updates (YCSB B)
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1       22,467     44.5µs         ≈0     1.04ms            -
+  pebble             1       23,033     43.4µs         ≈0     1.02ms            -
+  sqlite             1       22,267     44.9µs         ≈0     1.04ms            -
+  rocksdb            1       23,623     42.3µs         ≈0     1.04ms            -
+  redb               1       22,999     43.5µs         ≈0     1.04ms            -
+  wiredtiger         1       23,528     42.5µs         ≈0     1.04ms            -
+
+mixed: 50% reads, 50% updates (YCSB A)
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1        2,245    445.4µs         ≈0     1.40ms            -
+  pebble             1        2,325    430.2µs         ≈0     1.32ms            -
+  sqlite             1        2,265    441.4µs     16.3µs     1.54ms            -
+  rocksdb            1        2,338    427.7µs    404.9µs     1.41ms            -
+  redb               1        2,462    406.1µs         ≈0     1.56ms            -
+  wiredtiger         1        2,316    431.8µs    236.9µs     1.21ms            -
+
+update: 100% random updates, one key per transaction
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1        1,141    876.6µs     1.00ms     1.56ms            -
+  pebble             1        1,178    848.8µs    999.4µs     1.99ms            -
+  sqlite             1        1,528    654.3µs    524.1µs     1.58ms            -
+  rocksdb            1        1,165    858.2µs    998.3µs     1.69ms            -
+  redb               1        1,248    801.5µs    770.7µs     1.63ms            -
+  wiredtiger         1        1,175    850.9µs    945.5µs     1.59ms            -
+
+scan: short range scans from a random key (YCSB E, reads only)
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1      205,946      4.9µs         ≈0         ≈0            -
+  pebble             1      271,491      3.7µs         ≈0         ≈0            -
+  sqlite             1      151,842      6.6µs         ≈0     97.6µs            -
+  rocksdb            1      229,860      4.3µs         ≈0      8.5µs            -
+  redb               1      504,268      2.0µs         ≈0         ≈0            -
+  wiredtiger         1      567,368      1.8µs         ≈0         ≈0            -
+
+writers: N concurrent writers, one new key per transaction
+  store        threads        ops/s        avg        p50        p99      on disk
+  basedb             1        1,171    853.8µs     1.00ms     1.57ms            -
+  basedb             8        3,534     2.26ms     2.00ms     8.03ms            -
+  basedb            64       33,735     1.90ms     1.65ms     4.11ms            -
+  pebble             1        1,187    842.6µs    999.8µs     1.59ms            -
+  pebble             8        4,800     1.67ms     1.59ms     2.60ms            -
+  pebble            64       38,061     1.68ms     1.59ms     2.62ms            -
+  sqlite             1          746     1.34ms    523.6µs    30.70ms            -
+  sqlite             8          673    11.89ms     4.75ms    41.28ms            -
+  sqlite            64          657    97.46ms    96.00ms   137.66ms            -
+  rocksdb            1        1,177    849.8µs    999.2µs     1.55ms            -
+  rocksdb            8        4,981     1.61ms     1.58ms     2.62ms            -
+  rocksdb           64       37,348     1.71ms     1.59ms     3.20ms            -
+  redb               1        1,002    998.2µs     1.03ms     1.77ms            -
+  redb               8          981     8.15ms     7.91ms    37.00ms            -
+  redb              64          983    65.09ms    64.52ms   386.21ms            -
+  wiredtiger         1        1,196    835.9µs    919.8µs     1.57ms            -
+  wiredtiger         8        2,679     2.99ms     2.64ms    22.62ms            -
+  wiredtiger        64        8,064     7.94ms     6.00ms    32.94ms            -
+
+space: loaded
+  store             on disk
+  basedb           17.6 MiB
+  pebble           10.3 MiB
+  sqlite           13.4 MiB
+  rocksdb           1.6 MiB
+  redb             32.1 MiB
+  wiredtiger       13.0 MiB
+
+space: half deleted
+  store             on disk
+  basedb           17.6 MiB
+  pebble            0.9 MiB
+  sqlite           13.4 MiB
+  rocksdb           2.0 MiB
+  redb             32.1 MiB
+  wiredtiger       13.0 MiB
+
+space: refilled
+  store             on disk
+  basedb           20.5 MiB
+  pebble            5.6 MiB
+  sqlite           13.5 MiB
+  rocksdb           2.8 MiB
+  redb             32.1 MiB
+  wiredtiger       13.8 MiB
+
+avg is exact (time / operations). p50 and p99 come from per-operation timings; ≈0 means below this
+machine's clock resolution (on Windows a few µs or more), so read those from avg instead.
+on disk = the directory after a clean Close, without WiredTiger's preallocated log files.

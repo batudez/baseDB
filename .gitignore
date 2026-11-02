@@ -1,0 +1,23 @@
+# Built programs
+*.exe
+*.test
+/basedb
+!/cmd/basedb/
+
+# Local databases made while testing the terminal program
+/crashdb/
+/mydb/
+/mydddb/
+basedb-data/
+
+# Leftovers of the manual crash test
+/bulk.txt
+/bulk2.txt
+/out.txt
+
+# Benchmark dependencies, built by bench/compare/deps/build-*.ps1
+/bench/compare/deps/install/
+/bench/compare/deps/redb/target/
+
+# Local instructions for the coding assistant
+/claude.md
